@@ -1,0 +1,55 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
+  <head>
+    <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
+    <title>Uses xmlhttprequest to do stuff
+    </title>
+    <link type='text/css' rel='stylesheet' href='/index.css' />
+    <link rel='shortcut icon' href='/favicon.ico?' />
+  </head>
+  <body>
+
+    <div id='header'>
+        <p> hi there</p>
+    <pre><p id='foo'></p></pre>
+    <script>
+var foo = document.getElementById('foo')
+
+var xmlhttp; // create global
+var last_update = 0;
+function getStuff() {
+    time_interval_start = last_update
+    time_interval_end = Date.now()
+    last_update = time_interval_end; // prep for next time
+    xmlhttp = new XMLHttpRequest(); //global
+    request_str =  "/data?start=" + time_interval_start.toString() + "&end=" + time_interval_end.toString()
+    console.log(request_str)
+    xmlhttp.open('GET', request_str, true);
+
+
+    xmlhttp.onreadystatechange = function() {
+	if (xmlhttp.readyState == 4) {
+	    if(xmlhttp.status == 200) {
+		var obj = JSON.parse(xmlhttp.responseText);
+		console.log(obj)
+		foo.innerHTML += String(obj)
+		foo.innerHTML += '\n'
+
+		//var countryList = obj.countrylist;
+	    }
+	}
+    };
+
+    xmlhttp.send(null);
+}
+
+getStuff();
+
+setInterval(getStuff, 500);
+
+
+    </script>
+  </body>
+</html>
