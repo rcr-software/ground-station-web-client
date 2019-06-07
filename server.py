@@ -14,10 +14,12 @@ app = web.application(urls, globals())
 database = dict()
 
 
+# TODO make this a class instead of a multilambda - this isn't lisp for krist sake
 def background_read_data_maker():
     data = []
     fifo = None
     def get_data_from_time_range(start, end):
+        # TODO this will be replaced with a database query @tom
         nonlocal data
         return_lines = []
         for t, line in data:
