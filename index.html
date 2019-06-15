@@ -2,20 +2,63 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 
 <html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en' lang='en'>
-  <head>
-    <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
-    <title>Uses xmlhttprequest to do stuff
-    </title>
-    <link type='text/css' rel='stylesheet' href='/index.css' />
-    <link rel='shortcut icon' href='/favicon.ico?' />
-  </head>
-  <body>
+    <head>
+        <meta http-equiv='Content-Type' content='text/html;charset=utf-8' />
+        <title>Uses xmlhttprequest to do stuff
+        </title>
+        <link type='text/css' rel='stylesheet' href='/index.css' />
+        <link rel='shortcut icon' href='/favicon.ico?' />
 
-    <div id='header'>
-        <p> hi there</p>
-    <pre><p id='foo'></p></pre>
-    <script>
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css"
+                               integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+                               crossorigin=""/>
+
+        <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"
+                integrity="sha512-GffPMF3RvMeYyc1LWMHtK8EbPv0iNZ8/oTtHPx9/cc2ILxQ+u905qIwdpULaqDkyBKgOaB57QTMg7ztg8Jm2Og=="
+                crossorigin=""></script>
+
+    </head>
+    <body>
+
+        <div id='header'>
+            <p> hi there</p>
+
+
+            <div id="mapid"></div>
+
+            <pre><p id='foo'></p></pre>
+            <script>
+
+
+                var mymap = L.map('mapid').setView([32.3946, -106.47299], 13);
+L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
+    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+    maxZoom: 18,
+    id: 'mapbox.streets',
+    accessToken: 'pk.eyJ1IjoicmFpbnNtaXRoIiwiYSI6ImNqd3hwb3VveDB1cng0YXBnZGg1NGgzbHcifQ.4ifZd1hquwaghJJwh3KV7A'
+}).addTo(mymap);
+
 var foo = document.getElementById('foo')
+
+var path = [];
+var lastitem = null;
+
+var mylayer = L.geoJSON().addTo(mymap);
+
+
+
+function getColor(x) {
+
+    return x < 25     ?    '#bd0026':
+        x < 50     ?   '#f03b20':
+        x < 75     ?   '#fd8d3c':
+        x < 100     ?   '#fecc5c':
+        '#ffffb2' ;
+};
+
+function isString (value) {
+    return typeof value === 'string' || value instanceof String;
+}
 
 var xmlhttp; // create global
 var last_update = 0;
@@ -25,21 +68,49 @@ function getStuff() {
     last_update = time_interval_end; // prep for next time
     xmlhttp = new XMLHttpRequest(); //global
     request_str =  "/data?start=" + time_interval_start.toString() + "&end=" + time_interval_end.toString()
-    console.log(request_str)
     xmlhttp.open('GET', request_str, true);
 
 
     xmlhttp.onreadystatechange = function() {
-	if (xmlhttp.readyState == 4) {
-	    if(xmlhttp.status == 200) {
-		var obj = JSON.parse(xmlhttp.responseText);
-		console.log(obj)
-		foo.innerHTML += String(obj)
-		foo.innerHTML += '\n'
+        if (xmlhttp.readyState == 4) {
+            if(xmlhttp.status == 200) {
+                console.log(xmlhttp.responseText)
+                var obj = JSON.parse(xmlhttp.responseText);
+                if (!isString(obj[0]))
+                {
+                    console.log("obj is not list of strings")
+                }
+                
+                obj.forEach(function (item, index) {
+                    foo.innerHTML += String(item)
+                    foo.innerHTML += '\n'
+                    item = JSON.parse(item)
 
-		//var countryList = obj.countrylist;
-	    }
-	}
+                    if (lastitem === null) {
+                        lastitem = item // first time only
+                    } else {
+                        lastitem = path[path.length - 1] 
+                    }
+                        
+
+
+                    path.push(item)
+
+
+                    subpath = [[lastitem[0], lastitem[1]], [item[0], item[1]]]
+                    // create a red polyline from an array of LatLng points
+                    //mymap.removeLayer(lastpolyline)
+                    var polyline = L.polyline(subpath, {color: getColor(item[2])}).addTo(mymap);
+                    // zoom the map to the polyline
+                    //mymap.fitBounds(polyline.getBounds());
+                    lastpolyline = polyline
+
+                });
+
+
+                //var countryList = obj.countrylist;
+            }
+        }
     };
 
     xmlhttp.send(null);
@@ -50,6 +121,6 @@ getStuff();
 setInterval(getStuff, 500);
 
 
-    </script>
-  </body>
+            </script>
+    </body>
 </html>

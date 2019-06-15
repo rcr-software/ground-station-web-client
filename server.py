@@ -18,6 +18,7 @@ database = dict()
 def background_read_data_maker():
     data = []
     fifo = None
+
     def get_data_from_time_range(start, end):
         # TODO this will be replaced with a database query @tom
         nonlocal data
@@ -36,7 +37,7 @@ def background_read_data_maker():
             if line != "":
                 line = line.strip()
                 data.append((time.time()*1000, line))
-                print('got data: ', line)
+                print('got data: ', data[-1])
 
     return get_data_from_time_range, background_read_data
 
@@ -59,8 +60,9 @@ class data():
         d = web.input(start=None, end=None)
         d.start = float(d.start)
         d.end = float(d.end)
-        if not d.start or not d.end:
-            return 'need start and end!!'
+        if  d.start is None or d.end is None:
+            self.BadRequest(message='must have start and end')
+            return 'ERROR need start and end!!'
         return json.dumps(get_data_from_time_range(d.start, d.end))
 
 class static:
