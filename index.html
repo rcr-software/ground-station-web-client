@@ -9,13 +9,12 @@
         <link type='text/css' rel='stylesheet' href='/index.css' />
         <link rel='shortcut icon' href='/favicon.ico?' />
 
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css"
-                               integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
-                               crossorigin=""/>
 
-        <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"
-                integrity="sha512-GffPMF3RvMeYyc1LWMHtK8EbPv0iNZ8/oTtHPx9/cc2ILxQ+u905qIwdpULaqDkyBKgOaB57QTMg7ztg8Jm2Og=="
-                crossorigin=""></script>
+          <link rel="stylesheet" href="https://unpkg.com/leaflet@1.0.3/dist/leaflet.css" />
+          <script src="https://unpkg.com/leaflet@1.0.3/dist/leaflet.js"></script>
+          <link href="https://api.tiles.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.css" rel='stylesheet' />
+          <script src="https://api.tiles.mapbox.com/mapbox-gl-js/v0.35.1/mapbox-gl.js"></script>
+          <script src="/js/leaflet-mapbox-gl.js"></script>
 
     </head>
     <body>
@@ -23,14 +22,35 @@
         <div id='header'>
             <p> hi there</p>
 
+            <button onclick="toggle_map_visible()">Show/hide map</button>
 
             <div id="mapid"></div>
 
-            <pre><p id='foo'></p></pre>
-            <script>
+            <div class="flexcontainer">
+              <div class="flexitem">
+                <pre><p id='nosecone_text'></p></pre>
+              </div>
+              <div class="flexitem">
+                <pre><p id='vehicle_text'></p></pre>
+              </div>
+            </div>
+<script>
+
+var foo;
+
+function toggle_map_visible() {
+  var x = document.getElementById("mapid");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+  } else {
+    x.style.display = "none";
+  }
+}
+//toggle_map_visible()
+
+var mymap = L.map('mapid').setView([32.3946, -106.47299], 13);
 
 
-                var mymap = L.map('mapid').setView([32.3946, -106.47299], 13);
 L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
     maxZoom: 18,
@@ -38,14 +58,17 @@ L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={
     accessToken: 'pk.eyJ1IjoicmFpbnNtaXRoIiwiYSI6ImNqd3hwb3VveDB1cng0YXBnZGg1NGgzbHcifQ.4ifZd1hquwaghJJwh3KV7A'
 }).addTo(mymap);
 
-var foo = document.getElementById('foo')
+var nosecone_text = document.getElementById('nosecone_text')
+var vehicle_text = document.getElementById('vehicle_text')
+
+var last_tn_id = 0
+var last_tv_id = 0
 
 var path = [];
 var lastitem = null;
-
+/*
 var mylayer = L.geoJSON().addTo(mymap);
-
-
+*/
 
 function getColor(x) {
 
@@ -63,52 +86,36 @@ function isString (value) {
 var xmlhttp; // create global
 var last_update = 0;
 function getStuff() {
-    time_interval_start = last_update
-    time_interval_end = Date.now()
-    last_update = time_interval_end; // prep for next time
+    console.log(last_tn_id)
+    console.log(last_tv_id)
     xmlhttp = new XMLHttpRequest(); //global
-    request_str =  "/data?start=" + time_interval_start.toString() + "&end=" + time_interval_end.toString()
+    request_str =  "/data?last_tn_id=" + last_tn_id + "&last_tv_id=" + last_tv_id
     xmlhttp.open('GET', request_str, true);
-
 
     xmlhttp.onreadystatechange = function() {
         if (xmlhttp.readyState == 4) {
             if(xmlhttp.status == 200) {
-                console.log(xmlhttp.responseText)
+                console.log(xmlhttp.responseText);
                 var obj = JSON.parse(xmlhttp.responseText);
-                if (!isString(obj[0]))
+                if (obj.length === 4)
                 {
-                    console.log("obj is not list of strings")
+                    console.log("objs should be length 4")
+                    
                 }
-                
-                obj.forEach(function (item, index) {
-                    foo.innerHTML += String(item)
-                    foo.innerHTML += '\n'
-                    item = JSON.parse(item)
 
-                    if (lastitem === null) {
-                        lastitem = item // first time only
-                    } else {
-                        lastitem = path[path.length - 1] 
-                    }
-                        
+                nosecone_data = obj[0] //nested list
+                vehicle_data = obj[1] //nested list
+                last_tn_id = obj[2] // int
+                last_tv_id = obj[3] // int
 
-
-                    path.push(item)
-
-
-                    subpath = [[lastitem[0], lastitem[1]], [item[0], item[1]]]
-                    // create a red polyline from an array of LatLng points
-                    //mymap.removeLayer(lastpolyline)
-                    var polyline = L.polyline(subpath, {color: getColor(item[2])}).addTo(mymap);
-                    // zoom the map to the polyline
-                    //mymap.fitBounds(polyline.getBounds());
-                    lastpolyline = polyline
-
+                nosecone_data.forEach(function (item, index) {
+                    nosecone_text.innerHTML = String(item) + '\n' + nosecone_text.innerHTML
                 });
 
+                vehicle_data.forEach(function (item, index) {
+                    vehicle_text.innerHTML = String(item) + '\n' + vehicle_text.innerHTML
+                });
 
-                //var countryList = obj.countrylist;
             }
         }
     };
@@ -118,7 +125,7 @@ function getStuff() {
 
 getStuff();
 
-setInterval(getStuff, 500);
+setInterval(getStuff, 3000);
 
 
             </script>

@@ -3,5 +3,13 @@ body {
     background-color: lightblue;
 }
 
+.flexcontainer {
+  display: flex
+}
+
+.flexitem {
+  flex-grow: 1;
+}
+
 #mapid { height: 500px; }
 

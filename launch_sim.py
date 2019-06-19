@@ -1,3 +1,7 @@
+import math
+import json
+import time
+import random
 
 import mysql.connector
 
@@ -27,106 +31,42 @@ def test_connection(db):
 
     return True
 
-def distance(*args):
-    return sum([x**2 for x in args])**0.5
+def get_launch_id(db, description):
+    """ launch id is the auto incrementing foreign key to relate and find launches, it is create when
+    you call `usp_AddLaunch(descr VARCHAR(250))`"""
+    cursor = db.cursor()
+    sql_str = 'SELECT max(l_id) FROM LAUNCH WHERE l_description = ' + wrap_quotes(description) + ';'
+    print('sql_str: ', sql_str)
+    launch_id = cursor.execute(sql_str)
+    return cursor.fetchone()[0]
 
-class PhysicsObject():
-    def __init__(self, x, y, z, floor_z):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.floor_z = floor_z
-        self.dx = 0
-        self.dy = 0
-        self.dz = 0
-        self.speed = 0
-        self.acceleration = 0
+def write_rocket(db, launch_id, time_ms):
+    t = time_ms * 1000 # physics scaled time or something
+    alt = math.sin(t/10000)
+    x = (0.00000001) * t +  32.3946993
+    y = 0.0001*math.sin(t/10000) - 106.4729961
+    dx = 0.0001
+    dy = math.cos(t/10000)
+    speed = (dx**2+dy**2)**0.5
+    separation = int(alt > 0.5) # 1 or 0 based on altitude
 
-    def copy_from(self, other):
-        self.x = other.x
-        self.y = other.y
-        self.z = other.z
-        self.dx = other.dx
-        self.dy = other.dy
-        self.dz = other.dz
-        self.acceleration = 0
+    # 10% packet loss rate just for fun
+    if random.randint(0, 10) != 0:
+        proc_call(db, 'usp_AddTelemetry_Nosecone', launch_id, time_ms, alt, alt, speed, x, y,
+                  2.7*random.random(), 100*random.random(), separation, random.random())
 
-    def step(self, additional_dz=0):
-        starting_velocity = distance(self.dx, self.dy, self.dz)
-        
-        self.x += dx
-        self.y += dy
-        self.z += dz
-        if self.z < self.floor_z:
-            self.z = self.floor_z
-            self.dz = 0
+    x = (0.00000001) * t +  32.3946993
+    y = 0.0001*math.sin(-t/10000) - 106.4729961
+    dx = 0.0001
+    dy = math.cos(-t/10000)
+    speed = (dx**2+dy**2)**0.5
 
-        if self.z - self.floor_z > 100:
-            self.dx += 0.001
-            self.dy += 0.001
+    proc_call(db, 'usp_AddTelemetry_Vehicle', launch_id, time_ms, alt, speed, 0, x, y, 
+              2.7*random.random(), 100*random.random(), separation, random.random())
 
-        self.dx += 0.0001 * (random.random() - 0.5)
-        self.dy += 0.0001 * (random.random() - 0.5)
+def wrap_quotes(string):
+    return '"' + string + '"'
 
-        self.dx = self.dx * 0.9
-        self.dy = self.dy * 0.9
-
-        self.dz = self.dz - 16 + additional_dz
-   
-        self.acceleration = distance(self.dx, self.dy, self.dz) - starting_velocity
-        self.speed = distance(self.dx, self.dy, self.dz)
- 
-
-
-class Rocket():
-    def __init__(self, launch_id):
-        self.vehicle = Physics(32.3946993, -106.4729961, 4300.0, 4300.0)
-        self.nosecone = Physics(32.3946993, -106.4729961, 4300.0, 4300.0)
-        self.launch_id = launch_id
-        self.time = time.time() * 1000
-
-        self.fuel = 100
-        self.launched = False
-        self.seperation = False
-
-        self.temperature = 105.0
-        self.acceleration = 0
-        self.battery = 3.71
-        self.signal_strength = 1
-
-    def write_database(self, db):
-        proc_call(db, 'usp_AddTelemetry_Nosecone', self.launch_id, self.time,
-            self.nosecone.x, self.nosecone.z, self.nosecone.speed,
-            self.nosecone.x, self.nosecone.y, self.battery, self.temperature,
-            int(self.seperation), self.signal_strength)
-        proc_call(db, 'usp_AddTelemetry_Vehicle', self.launch_id, self.time,
-        self.vehicle.z, self.vehicle.z, self.vehicle.speed,
-            self.acceleration, self.x, self.y, self.battery,
-            self.temperature, int(self.seperation), self.signal_strength]
-
-    def launch(self):
-        self.launched = True
-
-    def physics_step(self):
-
-        self.time = time.time() * 1000
-        
-
-        if self.seperation:
-            self.nosecone.step()
-            self.vehicle.step()
-        else:
-            self.vehicle.step()
-            self.nosecone.copy_from(self.vehicle)
-
-        if self.launched and fuel > 0:
-            fuel -= 1
-            self.vehicle.dz += 300
-
-        if self.dz < -10:
-            self.seperation = True
-            self.nosecone.seperate()
-            
 def proc_call(db, name, *args):
     """ Call sigs for all the functions we have:
 
@@ -142,19 +82,36 @@ def proc_call(db, name, *args):
     """
 
     # python is the magic glue between everything!
-    sql_str = name + '(' + ', '.join(args) + ')'
+    args = [wrap_quotes(x) if (type(x) is str) else str(x) for x in args]
+    sql_str = 'CALL ' + name +  '(' + ', '.join(args) + ');'
 
-    dbCursor = con.cursor()
-    dbCursor.execute(sql_str)
-    con.commit()
+    cursor = db.cursor()
+    print('executing sql: ', sql_str)
+    cursor.execute(sql_str)
+    db.commit()
 
-ip = "127.0.0.1"
-launch_id = 1
+def launch_forever():
+    'only put this in a function because I am too weak to use the global namespace'
+    time_ms_start = time.time()
 
-print("New Launch")
+    # connect and raise error if not able to connect
+    db = connect_database("127.0.0.1")
+    test_connection(db)
 
-db = ConnectToDatabase(ip)
+    desc = 'simulated_launch_' + str(random.randint(1000, 9999))
+    proc_call(db, 'usp_AddLaunch', desc)
+    launch_id = get_launch_id(db, desc)
+    print(desc, 'launch_id = ', launch_id)
 
-desc = 'simulated launch ' + str(launch_id)
+    # write launch id so server knows what it is ;)
+    open('LAUNCH_ID', 'w').write(str(launch_id))
 
-proc_call(db, 'usp_AddLaunch', desc)
+    
+    while True:
+        time_ms = time.time() - time_ms_start
+        print(time_ms)
+        write_rocket(db, launch_id, time_ms)
+        time.sleep(2)
+
+if __name__ == '__main__':
+    launch_forever()
